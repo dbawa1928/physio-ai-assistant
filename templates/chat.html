@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ get_text('title', lang) }} - Consultation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>.chat-container{height:calc(100vh - 250px);overflow-y:auto}.message-bubble{max-width:80%;animation:fadeIn 0.3s ease-in}@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}</style>
+</head>
+<body class="bg-gradient-to-br from-purple-50 to-blue-50">
+    <div class="bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-3"><i class="fas fa-robot text-2xl"></i><div><h1 class="text-xl font-bold">{{ get_text('title', lang) }}</h1><p class="text-sm opacity-90">Patient: {{ patient_info.full_name }} | Age: {{ patient_info.age }}</p></div></div>
+                <div class="flex gap-3"><a href="/reset" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg"><i class="fas fa-plus mr-2"></i>{{ get_text('new_patient', lang) }}</a><a href="/history" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg"><i class="fas fa-history mr-2"></i>{{ get_text('history', lang) }}</a></div>
+            </div>
+        </div>
+    </div>
+    <div class="container mx-auto px-4 py-6">
+        <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
+            <div class="bg-gray-50 px-6 py-3 border-b border-gray-200 flex flex-wrap gap-4 text-sm">
+                <span><i class="fas fa-comment-medical text-purple-600"></i> <strong>{{ get_text('chief_complaint', lang) }}:</strong> {{ patient_info.chief_complaint[:50] }}...</span>
+                <span><i class="fas fa-exclamation-triangle text-orange-600"></i> <strong>{{ get_text('cause_injury', lang) }}:</strong> {{ patient_info.cause_of_injury[:50] or 'Not specified' }}...</span>
+            </div>
+            <div id="chatMessages" class="chat-container p-6 space-y-4 bg-gray-50" style="height:450px;">
+                <div class="text-center text-gray-500 py-8"><i class="fas fa-spinner fa-spin text-2xl"></i><p class="mt-2">{{ get_text('loading', lang) }}</p></div>
+            </div>
+            <div class="border-t border-gray-200 p-4 bg-white">
+                <div class="flex gap-3"><input type="text" id="messageInput" class="flex-1 px-4 py-3 border border-gray-300 rounded-lg" placeholder="{{ get_text('placeholder', lang) }}" autocomplete="off"><button id="sendBtn" class="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-lg font-semibold"><i class="fas fa-paper-plane"></i> {{ get_text('send', lang) }}</button></div>
+                <p class="text-xs text-gray-500 mt-2 text-center"><i class="fas fa-info-circle"></i> {{ get_text('info_questions', lang) }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="flex items-center mb-2"><i class="fas fa-robot text-purple-600 mr-2"></i><span class="text-xs font-semibold text-purple-600">Physio AI Assistant (forShubham Singh)</span></div>
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+    <script>function downloadPDF(reportHtml){const pdfDiv=document.getElementById('reportForPdf');pdfDiv.innerHTML=reportHtml;const element=document.getElementById('pdfContent');element.style.display='block';html2pdf().from(element).set({margin:[0.5,0.5,0.5,0.5],filename:'physio_report.pdf',html2canvas:{scale:2},jsPDF:{unit:'in',format:'a4',orientation:'portrait'}}).save().then(()=>{element.style.display='none'});}window.downloadPDF=downloadPDF;</script>
+</body>
+</html>
