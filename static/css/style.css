@@ -1,15 +1,41 @@
-.animate-fadeIn {
-    animation: fadeIn 0.3s ease-in;
+/* Additional styles for report edit page */
+.section-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+.section-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
 }
-.chat-container::-webkit-scrollbar { width: 6px; }
-.chat-container::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
-.chat-container::-webkit-scrollbar-thumb { background: #c4b5fd; border-radius: 10px; }
-.markdown-content h1, .markdown-content h2, .markdown-content h3 { margin-top: 1rem; margin-bottom: 0.5rem; font-weight: 600; }
-.markdown-content ul, .markdown-content ol { margin-left: 1.5rem; margin-bottom: 1rem; }
-.markdown-content li { margin-bottom: 0.25rem; }
-.markdown-content strong { color: #7c3aed; }
-.markdown-content p { margin-bottom: 0.75rem; line-height: 1.6; }
+.history-item {
+    transition: background 0.2s;
+}
+.history-item:hover {
+    background: #f9fafb;
+    cursor: pointer;
+}
+/* Scrollbar for chat */
+.chat-container::-webkit-scrollbar {
+    width: 6px;
+}
+.chat-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+.chat-container::-webkit-scrollbar-thumb {
+    background: #c4b5fd;
+    border-radius: 10px;
+}
+/* Watermark effect for PDF (in-browser preview) */
+.watermark {
+    position: relative;
+}
+.watermark::after {
+    content: "PhysioAI";
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    opacity: 0.2;
+    font-size: 40px;
+    transform: rotate(-15deg);
+    pointer-events: none;
+}

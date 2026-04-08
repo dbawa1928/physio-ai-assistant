@@ -6,68 +6,195 @@
     <title>{{ get_text('title', lang) }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>body{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)}.form-card{backdrop-filter:blur(10px);background:rgba(255,255,255,0.95)}</style>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .form-card {
+            backdrop-filter: blur(10px);
+            background: rgba(255,255,255,0.95);
+            transition: transform 0.2s;
+        }
+        .form-card:hover {
+            transform: translateY(-5px);
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            ring: 2px solid #7c3aed;
+        }
+    </style>
 </head>
-<body class="min-h-screen py-8">
+<body class="py-8">
     <div class="container mx-auto px-4 max-w-4xl">
         <div class="text-center mb-8">
-            <i class="fas fa-stethoscope text-6xl text-white mb-4"></i>
+            <div class="inline-block bg-white/20 p-4 rounded-full mb-4">
+                <i class="fas fa-stethoscope text-5xl text-white"></i>
+            </div>
             <h1 class="text-4xl font-bold text-white mb-2">{{ get_text('title', lang) }}</h1>
             <p class="text-white text-lg opacity-90">{{ get_text('subtitle', lang) }}</p>
         </div>
         <div class="form-card rounded-2xl shadow-2xl p-8">
             <div class="flex justify-end mb-4">
                 <form action="/set_language" method="POST">
-                    <select name="lang" onchange="this.form.submit()" class="px-3 py-1 rounded-lg border border-gray-300 text-sm">
+                    <select name="lang" onchange="this.form.submit()" class="px-3 py-1 rounded-lg border border-gray-300 text-sm bg-white">
                         <option value="en" {% if lang=='en' %}selected{% endif %}>English</option>
                         <option value="hi" {% if lang=='hi' %}selected{% endif %}>हिन्दी</option>
                     </select>
                 </form>
             </div>
-            <div class="flex items-center mb-6"><i class="fas fa-user-md text-3xl text-purple-600 mr-3"></i><h2 class="text-2xl font-bold text-gray-800">{{ get_text('patient_form', lang) }}</h2></div>
+            <div class="flex items-center mb-6">
+                <i class="fas fa-user-md text-3xl text-purple-600 mr-3"></i>
+                <h2 class="text-2xl font-bold text-gray-800">{{ get_text('patient_form', lang) }}</h2>
+            </div>
             <form action="/submit_patient" method="POST" class="space-y-6" id="patientForm">
-                <div class="bg-purple-50 rounded-lg p-4 mb-6">
-                    <h3 class="text-lg font-semibold text-purple-800 mb-4 flex items-center"><i class="fas fa-user-circle mr-2"></i> {{ get_text('personal_details', lang) }}</h3>
+                <div class="bg-purple-50 rounded-lg p-4">
+                    <h3 class="text-lg font-semibold text-purple-800 mb-4 flex items-center">
+                        <i class="fas fa-user-circle mr-2"></i> {{ get_text('personal_details', lang) }}
+                    </h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div><label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('full_name', lang) }} *</label><input type="text" name="full_name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('age', lang) }} *</label><input type="number" name="age" required class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('gender', lang) }} *</label><select name="gender" id="gender" required class="w-full px-4 py-2 border border-gray-300 rounded-lg"><option value="">{{ get_text('gender', lang) }}</option><option value="Male">{{ get_text('male', lang) }}</option><option value="Female">{{ get_text('female', lang) }}</option><option value="Other">{{ get_text('other', lang) }}</option></select></div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('phone', lang) }} *</label><input type="tel" name="phone" required class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('full_name', lang) }} *</label>
+                            <input type="text" name="full_name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('age', lang) }} *</label>
+                            <input type="number" name="age" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('gender', lang) }} *</label>
+                            <select name="gender" id="gender" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                                <option value="">{{ get_text('gender', lang) }}</option>
+                                <option value="Male">{{ get_text('male', lang) }}</option>
+                                <option value="Female">{{ get_text('female', lang) }}</option>
+                                <option value="Other">{{ get_text('other', lang) }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('phone', lang) }} *</label>
+                            <input type="tel" name="phone" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                        </div>
                     </div>
+                    
+                    <!-- Female-specific fields (appear before Occupation) -->
                     <div id="maritalDiv" style="display:none;" class="mt-4 pt-4 border-t border-purple-200">
                         <label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('marital_status', lang) }}</label>
-                        <select name="marital_status" id="maritalStatus" class="w-full px-4 py-2 border border-gray-300 rounded-lg"><option value="">{{ get_text('marital_status', lang) }}</option><option value="Married">{{ get_text('married', lang) }}</option><option value="Unmarried">{{ get_text('unmarried', lang) }}</option></select>
+                        <select name="marital_status" id="maritalStatus" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                            <option value="">{{ get_text('marital_status', lang) }}</option>
+                            <option value="Married">{{ get_text('married', lang) }}</option>
+                            <option value="Unmarried">{{ get_text('unmarried', lang) }}</option>
+                        </select>
                     </div>
                     <div id="pregnancyDiv" style="display:none;" class="mt-4 pt-4 border-t border-purple-200 space-y-4">
-                        <div><label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('pregnant', lang) }}</label><select name="is_pregnant" id="isPregnant" class="w-full px-4 py-2 border border-gray-300 rounded-lg"><option value="No">{{ get_text('pregnant_no', lang) }}</option><option value="Yes">{{ get_text('pregnant_yes', lang) }}</option></select></div>
-                        <div id="trimesterDiv" style="display:none;"><label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('trimester', lang) }}</label><select name="trimester" class="w-full px-4 py-2 border border-gray-300 rounded-lg"><option value="1st">{{ get_text('trimester_1', lang) }}</option><option value="2nd">{{ get_text('trimester_2', lang) }}</option><option value="3rd">{{ get_text('trimester_3', lang) }}</option></select></div>
-                        <div id="complicationsDiv" style="display:none;"><label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('pregnancy_complications', lang) }}</label><textarea name="pregnancy_complications" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea></div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('children_count', lang) }}</label><input type="number" name="children_count" min="0" value="0" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('pregnant', lang) }}</label>
+                            <select name="is_pregnant" id="isPregnant" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                                <option value="No">{{ get_text('pregnant_no', lang) }}</option>
+                                <option value="Yes">{{ get_text('pregnant_yes', lang) }}</option>
+                            </select>
+                        </div>
+                        <div id="trimesterDiv" style="display:none;">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('trimester', lang) }}</label>
+                            <select name="trimester" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                                <option value="1st">{{ get_text('trimester_1', lang) }}</option>
+                                <option value="2nd">{{ get_text('trimester_2', lang) }}</option>
+                                <option value="3rd">{{ get_text('trimester_3', lang) }}</option>
+                            </select>
+                        </div>
+                        <div id="complicationsDiv" style="display:none;">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('pregnancy_complications', lang) }}</label>
+                            <textarea name="pregnancy_complications" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('children_count', lang) }}</label>
+                            <input type="number" name="children_count" min="0" value="0" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                    </div>
+                    
+                    <!-- Occupation field (appears after female-specific fields) -->
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('occupation', lang) }}</label>
+                        <input type="text" name="occupation" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="e.g., Student, Software Engineer, Farmer">
                     </div>
                 </div>
-                <div class="bg-blue-50 rounded-lg p-4 mb-6">
-                    <h3 class="text-lg font-semibold text-blue-800 mb-4 flex items-center"><i class="fas fa-notes-medical mr-2"></i> {{ get_text('clinical_details', lang) }}</h3>
+                
+                <div class="bg-blue-50 rounded-lg p-4">
+                    <h3 class="text-lg font-semibold text-blue-800 mb-4 flex items-center">
+                        <i class="fas fa-notes-medical mr-2"></i> {{ get_text('clinical_details', lang) }}
+                    </h3>
                     <div class="space-y-4">
-                        <div><label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('chief_complaint', lang) }} *</label><textarea name="chief_complaint" required rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea></div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('cause_injury', lang) }}</label><textarea name="cause_of_injury" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea></div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('past_history', lang) }}</label><textarea name="past_history" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea></div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('surgical_history', lang) }}</label><textarea name="surgical_history" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea></div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('chief_complaint', lang) }} *</label>
+                            <textarea name="chief_complaint" required rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('cause_injury', lang) }}</label>
+                            <textarea name="cause_of_injury" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('past_history', lang) }}</label>
+                            <textarea name="past_history" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">{{ get_text('surgical_history', lang) }}</label>
+                            <textarea name="surgical_history" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea>
+                        </div>
                     </div>
                 </div>
+                
                 <div class="flex gap-4">
-                    <button type="submit" class="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:scale-105 transition-all"><i class="fas fa-comments mr-2"></i> {{ get_text('start_consult', lang) }}</button>
-                    <a href="/history" class="flex-1 bg-gray-600 text-white py-3 rounded-lg font-semibold text-center hover:bg-gray-700"><i class="fas fa-history mr-2"></i> {{ get_text('view_history', lang) }}</a>
+                    <button type="submit" class="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:scale-105 transition-all shadow-md">
+                        <i class="fas fa-comments mr-2"></i> {{ get_text('start_consult', lang) }}
+                    </button>
+                    <a href="/history" class="flex-1 bg-gray-600 text-white py-3 rounded-lg font-semibold text-center hover:bg-gray-700 transition shadow-md">
+                        <i class="fas fa-history mr-2"></i> {{ get_text('view_history', lang) }}
+                    </a>
                 </div>
             </form>
         </div>
-        <div class="text-center mt-6 text-white text-sm opacity-75"><i class="fas fa-shield-alt"></i> {{ get_text('secure', lang) }}</div>
+        <div class="text-center mt-6 text-white text-sm opacity-75">
+            <i class="fas fa-shield-alt"></i> {{ get_text('secure', lang) }}
+        </div>
     </div>
     <script>
-        const gender=document.getElementById('gender'), maritalDiv=document.getElementById('maritalDiv'), maritalStatus=document.getElementById('maritalStatus'), pregnancyDiv=document.getElementById('pregnancyDiv'), isPregnant=document.getElementById('isPregnant'), trimesterDiv=document.getElementById('trimesterDiv'), complicationsDiv=document.getElementById('complicationsDiv');
-        function updateMarital(){if(gender.value==='Female'){maritalDiv.style.display='block';updatePreg()}else{maritalDiv.style.display='none';pregnancyDiv.style.display='none'}}
-        function updatePreg(){if(gender.value==='Female'&&maritalStatus.value==='Married'){pregnancyDiv.style.display='block';updatePregFields()}else{pregnancyDiv.style.display='none'}}
-        function updatePregFields(){if(isPregnant.value==='Yes'){trimesterDiv.style.display='block';complicationsDiv.style.display='block'}else{trimesterDiv.style.display='none';complicationsDiv.style.display='none'}}
-        gender.addEventListener('change',updateMarital);maritalStatus.addEventListener('change',updatePreg);isPregnant.addEventListener('change',updatePregFields);updateMarital();
+        const gender = document.getElementById('gender');
+        const maritalDiv = document.getElementById('maritalDiv');
+        const maritalStatus = document.getElementById('maritalStatus');
+        const pregnancyDiv = document.getElementById('pregnancyDiv');
+        const isPregnant = document.getElementById('isPregnant');
+        const trimesterDiv = document.getElementById('trimesterDiv');
+        const complicationsDiv = document.getElementById('complicationsDiv');
+        
+        function updateMarital() {
+            if (gender.value === 'Female') {
+                maritalDiv.style.display = 'block';
+                updatePregnancy();
+            } else {
+                maritalDiv.style.display = 'none';
+                pregnancyDiv.style.display = 'none';
+            }
+        }
+        function updatePregnancy() {
+            if (gender.value === 'Female' && maritalStatus.value === 'Married') {
+                pregnancyDiv.style.display = 'block';
+                updatePregnancyFields();
+            } else {
+                pregnancyDiv.style.display = 'none';
+            }
+        }
+        function updatePregnancyFields() {
+            if (isPregnant.value === 'Yes') {
+                trimesterDiv.style.display = 'block';
+                complicationsDiv.style.display = 'block';
+            } else {
+                trimesterDiv.style.display = 'none';
+                complicationsDiv.style.display = 'none';
+            }
+        }
+        gender.addEventListener('change', updateMarital);
+        maritalStatus.addEventListener('change', updatePregnancy);
+        isPregnant.addEventListener('change', updatePregnancyFields);
+        updateMarital();
     </script>
 </body>
 </html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - PhysioAI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6">Admin Dashboard</h1>
+        <div class="grid md:grid-cols-2 gap-6">
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold mb-4">Feedback Summary</h2>
+                <div class="space-y-2">
+                    <p><i class="fas fa-thumbs-up text-green-600"></i> Positive: {{ feedback_stats.get('up', 0) }}</p>
+                    <p><i class="fas fa-thumbs-down text-red-600"></i> Negative: {{ feedback_stats.get('down', 0) }}</p>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold mb-4">Recent Consultations</h2>
+                <ul class="divide-y">
+                    {% for c in consultations %}
+                    <li class="py-2 flex justify-between">
+                        <span>{{ c[1] }} - {{ c[2][:10] }}</span>
+                        <a href="/view_report/{{ c[0] }}" class="text-purple-600 hover:underline">View</a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
