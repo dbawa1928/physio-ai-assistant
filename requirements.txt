@@ -6,3 +6,4 @@ bleach
 langdetect
 reportlab
 Pillow
+gunicorn
