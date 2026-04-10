@@ -1,33 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Consultation - Dr. Shubham Singh</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"><title>AI Consultation - Dr. Shubham Singh</title>
+    <script src="https://cdn.tailwindcss.com"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"><link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"><link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.png') }}">
 </head>
-<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen py-8">
-    <div class="container mx-auto max-w-2xl px-4">
-        <div class="bg-white rounded-2xl shadow-xl p-6">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold text-indigo-700">Question {{ q_num }} of {{ total }}</h2>
-                <i class="fas fa-robot text-3xl text-indigo-400"></i>
-            </div>
-            {% if remaining <= 2 %}
-            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-4 text-sm text-yellow-700">
-                <i class="fas fa-info-circle mr-1"></i> We may ask up to 10 questions if needed.
-            </div>
-            {% endif %}
-            <div class="bg-gray-50 rounded-xl p-5 mb-6">
-                <p class="text-gray-800 text-lg">{{ question }}</p>
-            </div>
-            <form method="POST">
-                <label class="block text-sm font-medium mb-2">Your Answer:</label>
-                <textarea name="answer" rows="3" class="w-full border rounded-lg px-3 py-2 mb-4" required></textarea>
-                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg"><i class="fas fa-arrow-right mr-2"></i> Next</button>
-            </form>
-        </div>
-    </div>
+<body class="bg-gradient-to-br from-purple-50 to-blue-50 min-h-screen py-8">
+    <div class="container mx-auto max-w-2xl px-4"><div class="bg-white rounded-2xl shadow-xl p-5"><div class="flex justify-between items-center mb-3 pb-2 border-b"><div><h2 class="text-lg font-bold text-purple-700">Question {{ q_num }} of {{ total }}</h2><p class="text-xs text-gray-500">Patient: {{ patient_info.full_name }}</p></div><div class="flex gap-2"><a href="/profile" class="text-gray-500"><i class="fas fa-user"></i></a>{% if session.role == 'admin' %}<a href="/admin" class="text-gray-500"><i class="fas fa-chart-line"></i></a>{% endif %}<a href="/logout" class="text-gray-500"><i class="fas fa-sign-out-alt"></i></a></div></div>{% if remaining <= 2 %}<div class="bg-yellow-50 border-l-4 border-yellow-400 p-2 mb-3 text-xs"><i class="fas fa-info-circle mr-1"></i> Up to 10 questions.</div>{% endif %}<div class="bg-gray-50 rounded-xl p-4 mb-5"><div class="flex items-start gap-2"><i class="fas fa-user-md text-purple-600 text-lg"></i><p class="text-gray-800 text-base">{{ question }}</p></div></div><form method="POST"><label class="block text-sm font-medium text-gray-700 mb-1">Your Answer:</label><textarea name="answer" rows="3" class="w-full border rounded-lg px-3 py-2 mb-3" required></textarea><button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold py-2 rounded-lg">Next</button></form><div class="mt-3 text-center"><a href="/reset" class="text-xs text-gray-500">Cancel consultation</a></div></div></div>
 </body>
 </html>

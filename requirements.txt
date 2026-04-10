@@ -6,4 +6,5 @@ bleach
 langdetect
 reportlab
 Pillow
-gunicorn
+werkzeug
+flask-caching

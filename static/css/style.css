@@ -1,19 +1,20 @@
-/* Additional styles for report edit page */
-.section-card {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+/* Custom animations */
+.animate-fadeIn {
+    animation: fadeIn 0.3s ease-in;
 }
-.section-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
-.history-item {
-    transition: background 0.2s;
-}
-.history-item:hover {
-    background: #f9fafb;
-    cursor: pointer;
-}
-/* Scrollbar for chat */
+
+/* Chat scrollbar */
 .chat-container::-webkit-scrollbar {
     width: 6px;
 }
@@ -25,17 +26,68 @@
     background: #c4b5fd;
     border-radius: 10px;
 }
-/* Watermark effect for PDF (in-browser preview) */
-.watermark {
-    position: relative;
+.chat-container::-webkit-scrollbar-thumb:hover {
+    background: #a78bfa;
 }
-.watermark::after {
-    content: "PhysioAI";
-    position: absolute;
-    bottom: 20px;
-    right: 20px;
-    opacity: 0.2;
-    font-size: 40px;
-    transform: rotate(-15deg);
-    pointer-events: none;
+
+/* Card hover effects */
+.section-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.section-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.history-item {
+    transition: background 0.2s;
+}
+.history-item:hover {
+    background: #f9fafb;
+    cursor: pointer;
+}
+
+/* Diagnosis card selected */
+.diagnosis-card.selected {
+    border: 2px solid #7c3aed;
+    background: #f3e8ff;
+    transform: scale(1.02);
+}
+
+.confidence-bar {
+    height: 8px;
+    border-radius: 4px;
+    background: #e5e7eb;
+    overflow: hidden;
+}
+.confidence-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #7c3aed, #3b82f6);
+}
+
+
+
+/* Mobile first adjustments */
+@media (max-width: 640px) {
+    .container {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+    }
+    h1, h2, h3 {
+        word-break: break-word;
+    }
+    table, .table-responsive {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+    button, .btn, a.btn {
+        white-space: normal;
+        word-break: break-word;
+    }
+    .modal-content {
+        width: 95%;
+        margin: 1rem auto;
+    }
 }

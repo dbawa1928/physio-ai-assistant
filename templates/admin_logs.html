@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"><title>Admin Logs - PhysioAI</title>
+    <script src="https://cdn.tailwindcss.com"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"><link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.png') }}">
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-3 sm:px-4 py-6 max-w-6xl">
+        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+            <div class="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-3 flex flex-wrap justify-between items-center gap-2"><h1 class="text-lg sm:text-xl font-bold"><i class="fas fa-history mr-2"></i>Admin Activity Logs</h1><a href="/admin" class="bg-white/20 hover:bg-white/30 px-3 py-1 rounded text-sm"><i class="fas fa-arrow-left mr-1"></i>Back</a></div>
+            <div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left text-xs">Time</th><th class="px-3 py-2 text-left text-xs">Action</th><th class="px-3 py-2 text-left text-xs">Target</th><th class="px-3 py-2 text-left text-xs hidden sm:table-cell">Details</th><th class="px-3 py-2 text-left text-xs hidden md:table-cell">IP</th></tr></thead><tbody>{% for log in logs %}<tr><td class="px-3 py-2 text-xs">{{ log.timestamp[:19] }}</td><td class="px-3 py-2 text-xs">{{ log.action }}</td><td class="px-3 py-2 text-xs">{{ log.target_type }}:{{ log.target_id[:10] }}</td><td class="px-3 py-2 text-xs hidden sm:table-cell">{{ log.details[:40] }}</td><td class="px-3 py-2 text-xs hidden md:table-cell">{{ log.ip_address }}</td></tr>{% else %}<tr><td colspan="5" class="px-3 py-4 text-center text-gray-500">No logs found.</td></tr>{% endfor %}</tbody></table></div>
+        </div>
+    </div>
+</body>
+</html>

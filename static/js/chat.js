@@ -41,6 +41,9 @@ async function loadChatState() {
         }
         currentConsultationId = data.consultation_id;
         renderMessages(data.messages);
+        if (data.current_step) {
+            updateProgress(data.current_step);
+        }
         if (data.is_complete) {
             document.getElementById('messageInput').disabled = true;
             document.getElementById('sendBtn').disabled = true;
@@ -92,6 +95,17 @@ function renderMessages(messages) {
     container.scrollTop = container.scrollHeight;
 }
 
+function updateProgress(step) {
+    const stepSpan = document.getElementById('currentStep');
+    const progressBar = document.getElementById('progressBar');
+    if (stepSpan && progressBar) {
+        stepSpan.innerText = step;
+        const total = parseInt(stepSpan.getAttribute('data-max') || 12);
+        const percent = (step / total) * 100;
+        progressBar.style.width = percent + '%';
+    }
+}
+
 async function submitFeedback(messageIndex, rating) {
     try {
         await fetch('/submit_feedback', {
@@ -138,6 +152,7 @@ async function sendMessage() {
             input.value = message;
         } else {
             await loadChatState();
+            if (data.current_step) updateProgress(data.current_step);
             if (data.is_complete) {
                 sendBtn.innerHTML = '<i class="fas fa-check-circle"></i> Complete';
                 input.disabled = true;
@@ -183,5 +198,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sendBtn) sendBtn.addEventListener('click', sendMessage);
     if (input) input.addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && !isProcessing) sendMessage();
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.key === 'Enter') {
+            e.preventDefault();
+            sendMessage();
+        }
+        if (e.ctrlKey && e.shiftKey && e.key === 'P') {
+            e.preventDefault();
+            window.print();
+        }
     });
 });

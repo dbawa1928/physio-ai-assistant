@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Login - PhysioAI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.png') }}">
+    <style>.animate-pulse-slow{animation:pulse 2s cubic-bezier(0.4,0,0.6,1) infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}</style>
+</head>
+<body class="bg-gradient-to-br from-purple-600 to-blue-600 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-2xl w-full max-w-md transform transition-all hover:scale-105">
+        <div class="text-center mb-6">
+            <i class="fas fa-stethoscope text-5xl text-purple-600 animate-pulse-slow"></i>
+            <h1 class="text-2xl sm:text-3xl font-bold mt-2 text-gray-800">PhysioAI</h1>
+            <p class="text-gray-500 text-sm">Smart Physiotherapy Platform</p>
+        </div>
+        {% if error %}<div class="bg-red-100 text-red-700 p-3 rounded-lg mb-4 text-sm">{{ error }}</div>{% endif %}
+        <form method="POST">
+            <div class="mb-3"><label class="block text-gray-700 text-sm font-bold mb-2">Email Address</label><input type="email" name="email" placeholder="doctor@example.com" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" required></div>
+            <div class="mb-4"><label class="block text-gray-700 text-sm font-bold mb-2">Password</label><input type="password" name="password" placeholder="••••••••" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" required></div>
+            <div class="text-right mb-4"><a href="/forgot_password" class="text-sm text-purple-600 hover:underline">Forgot password?</a></div>
+            <button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 rounded-lg font-semibold hover:scale-105 transition transform">Login</button>
+        </form>
+        <p class="text-center text-sm text-gray-500 mt-4">Don't have an account? <a href="/register" class="text-purple-600 hover:underline">Register as Doctor</a></p>
+    </div>
+</body>
+</html>
