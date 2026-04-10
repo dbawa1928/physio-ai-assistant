@@ -9,6 +9,7 @@ import csv
 import io
 import threading
 import secrets
+import random
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_file
 from flask_mail import Mail, Message
@@ -36,7 +37,7 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 app.config['CACHE_TYPE'] = 'SimpleCache'
 app.config['CACHE_DEFAULT_TIMEOUT'] = 300
 
-# Email configuration (optional – if not set, reset links are printed to console)
+# Email configuration (optional – if not set, OTPs are printed to console)
 app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
 app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', 'True') == 'True'
@@ -71,7 +72,9 @@ def init_db():
         last_login TEXT,
         must_change_password INTEGER DEFAULT 0,
         reset_token TEXT,
-        reset_token_expiry TEXT
+        reset_token_expiry TEXT,
+        otp_code TEXT,
+        otp_expiry TEXT
     )''')
 
     # Consultations table
@@ -151,6 +154,14 @@ def init_db():
         c.execute("ALTER TABLE users ADD COLUMN reset_token_expiry TEXT")
     except sqlite3.OperationalError:
         pass
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN otp_code TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN otp_expiry TEXT")
+    except sqlite3.OperationalError:
+        pass
 
     conn.commit()
 
@@ -205,16 +216,18 @@ def log_admin_action(action, target_type, target_id, details=""):
         conn.commit()
         conn.close()
 
-def send_reset_email(email, token):
-    reset_url = url_for('reset_password', token=token, _external=True)
-    subject = "PhysioAI - Password Reset Request"
+def generate_otp():
+    return ''.join([str(random.randint(0, 9)) for _ in range(6)])
+
+def send_otp_email(email, otp):
+    subject = "PhysioAI - Password Reset OTP"
     body = f"""Hello,
 
 You requested to reset your password for your PhysioAI account.
 
-Click the link below to reset your password (valid for 1 hour):
+Your One-Time Password (OTP) is: {otp}
 
-{reset_url}
+This OTP is valid for 10 minutes.
 
 If you did not request this, please ignore this email.
 
@@ -222,7 +235,7 @@ Best regards,
 PhysioAI Team
 """
     # Print to console for development/testing
-    print(f"\n=== PASSWORD RESET LINK ===\n{reset_url}\n==========================\n")
+    print(f"\n=== OTP for {email} ===\n{otp}\n========================\n")
     if app.config['MAIL_USERNAME'] and app.config['MAIL_PASSWORD']:
         try:
             msg = Message(subject, recipients=[email], body=body)
@@ -231,7 +244,7 @@ PhysioAI Team
         except Exception as e:
             app.logger.error(f"Email send failed: {e}")
             return False
-    return True  # Link printed to console, user can copy it
+    return True  # OTP printed to console
 
 def save_consultation(consultation_id, patient_info, chat_history, final_report, structured_rec=None, diagnosis=None):
     conn = sqlite3.connect('consultations.db')
@@ -402,7 +415,7 @@ Output EXACTLY in this JSON format (no extra text):
             recommendations[key] = []
     return recommendations
 
-# ---------------------------- Forgot Password Routes ----------------------------
+# ---------------------------- OTP Forgot Password Routes ----------------------------
 @app.route('/forgot_password', methods=['GET', 'POST'])
 def forgot_password():
     if request.method == 'POST':
@@ -411,52 +424,80 @@ def forgot_password():
             return render_template('forgot_password.html', error='Email is required')
         conn = sqlite3.connect('consultations.db')
         c = conn.cursor()
-        c.execute("SELECT id, email FROM users WHERE email = ?", (email,))
+        c.execute("SELECT id FROM users WHERE email = ?", (email,))
+        user = c.fetchone()
+        if not user:
+            conn.close()
+            # Don't reveal if email exists
+            return render_template('forgot_password.html', message='If that email is registered, you will receive an OTP.')
+        # Generate OTP
+        otp = generate_otp()
+        expiry = (datetime.now() + timedelta(minutes=10)).isoformat()
+        c.execute("UPDATE users SET otp_code = ?, otp_expiry = ? WHERE id = ?", (otp, expiry, user[0]))
+        conn.commit()
+        conn.close()
+        if send_otp_email(email, otp):
+            # Store email in session temporarily for OTP verification
+            session['reset_email'] = email
+            return redirect(url_for('verify_otp'))
+        else:
+            return render_template('forgot_password.html', error='Failed to send OTP. Please try again.')
+    return render_template('forgot_password.html', error=None, message=None)
+
+@app.route('/verify_otp', methods=['GET', 'POST'])
+def verify_otp():
+    if 'reset_email' not in session:
+        return redirect(url_for('forgot_password'))
+    email = session['reset_email']
+    if request.method == 'POST':
+        otp = request.form.get('otp')
+        if not otp:
+            return render_template('verify_otp.html', error='OTP is required', email=email)
+        conn = sqlite3.connect('consultations.db')
+        c = conn.cursor()
+        c.execute("SELECT id, otp_code, otp_expiry FROM users WHERE email = ?", (email,))
         user = c.fetchone()
         conn.close()
         if not user:
-            # Security: don't reveal if email exists
-            return render_template('forgot_password.html', message='If that email is registered, you will receive a password reset link.')
-        token = secrets.token_urlsafe(32)
-        expiry = (datetime.now() + timedelta(hours=1)).isoformat()
+            session.pop('reset_email', None)
+            return redirect(url_for('forgot_password'))
+        stored_otp = user[1]
+        expiry = datetime.fromisoformat(user[2]) if user[2] else None
+        if not stored_otp or not expiry or datetime.now() > expiry:
+            return render_template('verify_otp.html', error='OTP expired. Please request a new one.', email=email)
+        if otp != stored_otp:
+            return render_template('verify_otp.html', error='Invalid OTP. Please try again.', email=email)
+        # OTP valid – clear it and proceed to reset password
         conn = sqlite3.connect('consultations.db')
         c = conn.cursor()
-        c.execute("UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?", (token, expiry, user[0]))
+        c.execute("UPDATE users SET otp_code = NULL, otp_expiry = NULL WHERE id = ?", (user[0],))
         conn.commit()
         conn.close()
-        if send_reset_email(email, token):
-            return render_template('forgot_password.html', message='Password reset link has been sent. (Check console if email not configured)')
-        else:
-            return render_template('forgot_password.html', error='Failed to send email. Please try again later.')
-    return render_template('forgot_password.html', error=None, message=None)
+        session['reset_user_id'] = user[0]
+        session.pop('reset_email', None)
+        return redirect(url_for('reset_password_with_otp'))
+    return render_template('verify_otp.html', email=email)
 
-@app.route('/reset_password/<token>', methods=['GET', 'POST'])
-def reset_password(token):
-    conn = sqlite3.connect('consultations.db')
-    c = conn.cursor()
-    c.execute("SELECT id, email, reset_token_expiry FROM users WHERE reset_token = ?", (token,))
-    user = c.fetchone()
-    conn.close()
-    if not user:
-        return render_template('reset_password.html', error='Invalid or expired reset link.')
-    expiry = datetime.fromisoformat(user[2])
-    if datetime.now() > expiry:
-        return render_template('reset_password.html', error='Reset link has expired. Please request a new one.')
+@app.route('/reset_password_otp', methods=['GET', 'POST'])
+def reset_password_with_otp():
+    if 'reset_user_id' not in session:
+        return redirect(url_for('forgot_password'))
     if request.method == 'POST':
         password = request.form.get('password')
         confirm = request.form.get('confirm_password')
         if not password or len(password) < 6:
-            return render_template('reset_password.html', error='Password must be at least 6 characters.', token=token)
+            return render_template('reset_password_otp.html', error='Password must be at least 6 characters.')
         if password != confirm:
-            return render_template('reset_password.html', error='Passwords do not match.', token=token)
+            return render_template('reset_password_otp.html', error='Passwords do not match.')
         hashed = generate_password_hash(password)
         conn = sqlite3.connect('consultations.db')
         c = conn.cursor()
-        c.execute("UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expiry = NULL, must_change_password = 0 WHERE id = ?", (hashed, user[0]))
+        c.execute("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?", (hashed, session['reset_user_id']))
         conn.commit()
         conn.close()
+        session.pop('reset_user_id', None)
         return redirect(url_for('login'))
-    return render_template('reset_password.html', token=token, error=None)
+    return render_template('reset_password_otp.html')
 
 # ---------------------------- Auth Routes ----------------------------
 @app.route('/login', methods=['GET', 'POST'])
