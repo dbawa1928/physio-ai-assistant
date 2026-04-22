@@ -1253,10 +1253,10 @@ def download_structured_pdf(consultation_id):
     story.append(Spacer(1, 12))
     story.append(Paragraph("Patient Information", heading_style))
     patient_data = [
-        [f"<b>Name:</b> {patient['name']}", f"<b>Age:</b> {patient['age']}", f"<b>Gender:</b> {patient['gender']}"],
-        [f"<b>Phone:</b> {patient['phone']}", f"<b>Occupation:</b> {patient['occupation']}", ""],
-        [f"<b>Chief Complaint:</b> {patient['chief_complaint']}", "", ""]
-    ]
+    [f"Name: {patient['name']}", f"Age: {patient['age']}", f"Gender: {patient['gender']}"],
+    [f"Phone: {patient['phone']}", f"Occupation: {patient['occupation']}", ""],
+    [f"Chief Complaint: {patient['chief_complaint']}", "", ""]
+]
     t = Table(patient_data, colWidths=[2.2*inch, 1.8*inch, 1.8*inch])
     t.setStyle(TableStyle([
         ('FONTSIZE', (0,0), (-1,-1), 9),
