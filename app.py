@@ -290,16 +290,17 @@ def ask_ai(prompt, system_msg=None, use_cache=True, max_tokens=250):
         return cache.cache._cache[cache_key]
 
     if not system_msg:
-        system_msg = """You are Dr. Shubham Singh, a senior physiotherapist with 20 years of clinical experience. 
+        system_msg = """You are Dr. Physioo, a senior physiotherapist with 20 years of clinical experience. 
         You are conducting a consultation with a patient. Your tone is professional, empathetic, and thorough.
         STRICT RULES:
         1. Ask ONLY ONE question per response. No extra text, no advice, no exercises, no diagnosis.
         2. Do NOT include any markdown formatting, bullet points, or numbered lists.
         3. Keep your response very short – just a single, clear question (max 20 words).
         4. Always respond in English.
-        5. Do NOT repeat previous questions.
-        6. Use the patient's age, gender, occupation, and chief complaint to ask clinically relevant questions.
-        7. If you have enough information (after 10-12 exchanges), output exactly "FINAL_REPORT" and nothing else."""
+        5. Do NOT repeat a question you have already asked.
+        6. Do NOT ask about something the patient has already told you. For example, if the patient said "using laptop", do not ask "Do you use a laptop?" Instead, ask a more specific follow-up like "How many hours a day do you use the laptop?" or "Do you feel numbness in your hands when using the laptop?"
+        7. Use the patient's age, gender, occupation, and chief complaint to ask clinically relevant questions.
+        8. If you have enough information (after 10-12 exchanges), output exactly "FINAL_REPORT" and nothing else."""
 
     for attempt in range(3):
         try:
@@ -964,7 +965,7 @@ def request_pdf(consultation_id):
     patient_info = {'name': row[0], 'age': row[1], 'gender': row[2], 'phone': row[3], 'occupation': row[4], 'chief_complaint': row[5]}
     diagnosis = row[6] or "Not specified"
     structured_rec = json.loads(row[7]) if row[7] else {}
-    doctor_name = session.get('full_name', 'Dr. Shubham Singh')
+    doctor_name = session.get('full_name', 'Dr. Physioo')
     c.execute("INSERT INTO async_tasks (id, task_type, status, created_at) VALUES (?,?,?,?)", (consultation_id, 'pdf_generation', 'pending', datetime.now().isoformat()))
     conn.commit()
     conn.close()
@@ -1013,7 +1014,7 @@ def print_report(consultation_id):
         report['structured_recommendations'] = json.loads(report['structured_recommendations'])
     else:
         report['structured_recommendations'] = {}
-    return render_template('print_report.html', report=report, doctor_name=session.get('full_name', 'Dr. Shubham Singh'))
+    return render_template('print_report.html', report=report, doctor_name=session.get('full_name', 'Dr. Physioo'))
 
 # ---------------------------- Main Consultation Routes ----------------------------
 @app.route('/')
@@ -1064,7 +1065,7 @@ Occupation: {patient_info.get('occupation', 'unknown')}.
 Chief complaint: {patient_info['chief_complaint']}.
 Cause of injury: {patient_info.get('cause_of_injury', 'unknown')}.
 Pregnancy: {patient_info.get('is_pregnant', 'No')}.
-Ask the very first question as Dr. Shubham Singh (20 years experience). Be empathetic, professional, and consider the patient's occupation. Only one question."""
+Ask the very first question as Dr. Physioo (20 years experience). Be empathetic, professional, and consider the patient's occupation. Only one question."""
     return ask_ai(context)
 
 @app.route('/chat')
@@ -1110,15 +1111,41 @@ def send_answer():
         session['is_complete'] = True
         session.modified = True
         return jsonify({'is_complete': True, 'messages': session['chat_history'], 'consultation_id': session['consultation_id']})
-    last_few = session['chat_history'][-6:]
+
+    # --- Extract all assistant questions already asked ---
+    asked_questions = [msg['content'] for msg in session['chat_history'] if msg['role'] == 'assistant']
+    asked_questions_text = "\n".join([f"- {q}" for q in asked_questions]) if asked_questions else "None yet."
+
+    # --- Extract known facts from patient answers (deduplicated) ---
+    patient_answers = [msg['content'] for msg in session['chat_history'] if msg['role'] == 'user']
+    # Remove duplicates while preserving order
+    unique_answers = list(dict.fromkeys(patient_answers))
+    known_facts_text = "\n".join([f"- {fact}" for fact in unique_answers]) if unique_answers else "None yet."
+
+    last_few = session['chat_history'][-6:]  # keep recent conversation for context
     conversation = "\n".join([f"{m['role']}: {m['content']}" for m in last_few])
-    prompt = f"""You are Dr. Shubham Singh, senior physiotherapist (20 years experience). Continue the consultation.
+
+    prompt = f"""You are Dr. Physioo, senior physiotherapist (20 years experience). Continue the consultation.
 Patient occupation: {session['patient_info'].get('occupation', 'unknown')}
 Patient has answered {user_msg_count} questions so far. Max {MAX_QUESTIONS}.
-Ask only ONE follow-up question. Be professional, empathetic, and consider their job.
-Conversation:
+
+CRITICAL INSTRUCTIONS:
+1. The patient has already told you these facts (do NOT ask about them again in a general way):
+{known_facts_text}
+
+2. You have already asked these exact questions (do NOT repeat them):
+{asked_questions_text}
+
+3. Only ask for NEW information. For example:
+   - If patient said "using laptop", do NOT ask "Do you use a laptop?" – that is already answered.
+   - You MAY ask a more specific follow-up: "How many hours a day do you use the laptop?" or "Do you get numbness in your hands?"
+   - If patient said "yes" to carrying a heavy backpack, do NOT ask "Do you carry a heavy backpack?" – ask "How heavy is your backpack?" instead.
+
+Recent conversation:
 {conversation}
-Your next question:"""
+
+Your next question (one only, must gather new information, must not repeat any fact or question above):"""
+
     ai_response = ask_ai(prompt)
     session['chat_history'].append({'role': 'assistant', 'content': ai_response})
     session.modified = True
@@ -1248,7 +1275,7 @@ def download_structured_pdf(consultation_id):
     story.append(Paragraph("🏥 PhysioAI", title_style))
     story.append(Paragraph("Smart Physiotherapy Consultation & Report", styles['Normal']))
     story.append(Spacer(1, 6))
-    doctor_name = session.get('full_name', 'Dr. Shubham Singh')
+    doctor_name = session.get('full_name', 'Dr. Physioo')
     story.append(Paragraph(f"<b>{doctor_name} (PT)</b><br/>Senior Physiotherapist", doctor_style))
     story.append(Spacer(1, 12))
     story.append(Paragraph("Patient Information", heading_style))
@@ -1430,7 +1457,7 @@ def get_text(key, lang):
         'start_first': {'en': 'Start your first consultation', 'hi': 'अपना पहला परामर्श शुरू करें'},
         'placeholder': {'en': 'Type your answer...', 'hi': 'अपना उत्तर लिखें...'},
         'send': {'en': 'Send', 'hi': 'भेजें'},
-        'info_questions': {'en': 'Answer Dr. Shubham Singh\'s questions to get a complete report', 'hi': 'पूरी रिपोर्ट प्राप्त करने के लिए डॉ. शुभम सिंह के प्रश्नों का उत्तर दें'},
+        'info_questions': {'en': 'Answer Dr. Physioo\'s questions to get a complete report', 'hi': 'पूरी रिपोर्ट प्राप्त करने के लिए डॉ. शुभम सिंह के प्रश्नों का उत्तर दें'},
         'loading': {'en': 'Loading conversation...', 'hi': 'बातचीत लोड हो रही है...'},
         'final_assessment': {'en': 'Final Assessment Report', 'hi': 'अंतिम मूल्यांकन रिपोर्ट'},
         'male': {'en': 'Male', 'hi': 'पुरुष'},

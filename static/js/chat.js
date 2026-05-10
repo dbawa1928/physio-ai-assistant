@@ -11,7 +11,7 @@ function showTypingIndicator() {
         <div class="bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm">
             <div class="flex items-center space-x-2">
                 <i class="fas fa-user-md text-purple-600"></i>
-                <span class="text-xs font-semibold text-purple-600">Dr. Shubham Singh (PT)</span>
+                <span class="text-xs font-semibold text-purple-600">Dr. Physio (PT)</span>
                 <div class="flex space-x-1">
                     <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:0s"></div>
                     <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:0.2s"></div>
@@ -82,7 +82,7 @@ function renderMessages(messages) {
         return `
             <div class="flex ${alignment} animate-fadeIn">
                 <div class="message-bubble ${bubbleClass} rounded-2xl px-4 py-3 shadow-sm max-w-[80%]">
-                    ${!isUser ? '<div class="flex items-center mb-2"><i class="fas fa-user-md text-purple-600 mr-2"></i><span class="text-xs font-semibold text-purple-600">Dr. Shubham Singh (PT)</span></div>' : ''}
+                    ${!isUser ? '<div class="flex items-center mb-2"><i class="fas fa-user-md text-purple-600 mr-2"></i><span class="text-xs font-semibold text-purple-600">Dr. Physio (PT)</span></div>' : ''}
                     <div class="${isUser ? 'text-white' : 'text-gray-800'} leading-relaxed">${content}</div>
                     <div class="text-xs ${isUser ? 'text-purple-200' : 'text-gray-400'} mt-1">
                         ${new Date().toLocaleTimeString()}
