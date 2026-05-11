@@ -6,16 +6,15 @@
     <title>Doctor Registration - PhysioAI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/static/favicon.png">
     <style>
-        /* tiny extra for smoother icon interaction, no design changes */
-        .password-toggle-icon {
-            cursor: pointer;
-            transition: color 0.2s ease;
-        }
-        .password-toggle-icon:hover {
-            color: #7c3aed; /* purple-600 */
-        }
+        .password-toggle-icon { cursor: pointer; transition: color 0.2s; }
+        .password-toggle-icon:hover { color: #7c3aed; }
+        .password-strength { font-size: 0.75rem; margin-top: 4px; }
+        .weak { color: #dc2626; }
+        .medium { color: #f59e0b; }
+        .strong { color: #10b981; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-purple-600 to-blue-600 min-h-screen flex items-center justify-center">
@@ -25,97 +24,78 @@
             <h1 class="text-2xl font-bold mt-2 text-gray-800">Doctor Registration</h1>
             <p class="text-gray-500">Join as a Physiotherapy Professional</p>
         </div>
-
         {% if error %}
         <div class="bg-red-100 text-red-700 p-3 rounded-lg mb-4 text-sm">{{ error }}</div>
         {% endif %}
-
-        <form method="POST">
-            <!-- Full Name -->
+        <form method="POST" onsubmit="return validatePassword()">
             <input type="text" name="full_name" placeholder="Full Name" class="w-full px-4 py-2 border border-gray-300 rounded-lg mb-3 focus:ring-2 focus:ring-purple-500" required>
-
-            <!-- Email Address -->
             <input type="email" name="email" placeholder="Email Address" class="w-full px-4 py-2 border border-gray-300 rounded-lg mb-3 focus:ring-2 focus:ring-purple-500" required>
-
-            <!-- Phone Number -->
             <input type="tel" name="phone" placeholder="Phone Number" class="w-full px-4 py-2 border border-gray-300 rounded-lg mb-3 focus:ring-2 focus:ring-purple-500" required>
-
-            <!-- Password field with eye toggle (mb-3 spacing preserved) -->
-            <div class="relative mb-3">
-                <input type="password" name="password" id="passwordInput" placeholder="Password" 
-                       class="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" 
-                       required>
-                <span class="absolute inset-y-0 right-0 flex items-center pr-3 password-toggle-icon" id="togglePassword">
-                    <i class="fas fa-eye text-gray-500" id="passwordEyeIcon"></i>
+            
+            <div class="relative mb-2">
+                <input type="password" name="password" id="password" placeholder="Password" class="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" required>
+                <span class="absolute inset-y-0 right-0 flex items-center pr-3 password-toggle-icon" onclick="togglePassword('password', 'eyeIcon1')">
+                    <i class="fas fa-eye text-gray-500" id="eyeIcon1"></i>
                 </span>
             </div>
-
-            <!-- Confirm Password field with eye toggle (mb-4 spacing preserved) -->
+            <div class="password-strength" id="strengthMsg"></div>
+            
             <div class="relative mb-4">
-                <input type="password" name="confirm_password" id="confirmPasswordInput" placeholder="Confirm Password" 
-                       class="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" 
-                       required>
-                <span class="absolute inset-y-0 right-0 flex items-center pr-3 password-toggle-icon" id="toggleConfirmPassword">
-                    <i class="fas fa-eye text-gray-500" id="confirmEyeIcon"></i>
+                <input type="password" name="confirm_password" id="confirm" placeholder="Confirm Password" class="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" required>
+                <span class="absolute inset-y-0 right-0 flex items-center pr-3 password-toggle-icon" onclick="togglePassword('confirm', 'eyeIcon2')">
+                    <i class="fas fa-eye text-gray-500" id="eyeIcon2"></i>
                 </span>
             </div>
-
-            <!-- Register Button -->
-            <button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 rounded-lg font-semibold hover:scale-105 transition">
-                Register
-            </button>
+            
+            <button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 rounded-lg font-semibold hover:scale-105 transition">Register</button>
         </form>
-
-        <p class="text-center text-sm text-gray-500 mt-4">
-            Already registered? <a href="/login" class="text-purple-600 hover:underline">Login</a>
-        </p>
+        <p class="text-center text-sm text-gray-500 mt-4">Already registered? <a href="/login" class="text-purple-600 hover:underline">Login</a></p>
     </div>
-
     <script>
-        (function() {
-            // Get DOM elements
-            const passwordInput = document.getElementById('passwordInput');
-            const confirmPasswordInput = document.getElementById('confirmPasswordInput');
-            const togglePassword = document.getElementById('togglePassword');
-            const toggleConfirm = document.getElementById('toggleConfirmPassword');
-            const passwordEyeIcon = document.getElementById('passwordEyeIcon');
-            const confirmEyeIcon = document.getElementById('confirmEyeIcon');
-
-            // Helper: toggle password visibility for given input & eye icon element
-            function toggleVisibility(inputField, eyeIconElement) {
-                if (!inputField || !eyeIconElement) return;
-                // Check current type
-                if (inputField.type === 'password') {
-                    inputField.type = 'text';
-                    // change icon to 'eye-slash' indicating password is visible
-                    eyeIconElement.classList.remove('fa-eye');
-                    eyeIconElement.classList.add('fa-eye-slash');
-                } else {
-                    inputField.type = 'password';
-                    // change icon back to 'eye' indicating hidden
-                    eyeIconElement.classList.remove('fa-eye-slash');
-                    eyeIconElement.classList.add('fa-eye');
-                }
+        function togglePassword(fieldId, iconId) {
+            const field = document.getElementById(fieldId);
+            const icon = document.getElementById(iconId);
+            if (field.type === 'password') {
+                field.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                field.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
             }
-
-            // Event listeners for password toggles
-            if (togglePassword && passwordInput && passwordEyeIcon) {
-                togglePassword.addEventListener('click', function(e) {
-                    e.preventDefault();   // avoid any unintended ripple
-                    toggleVisibility(passwordInput, passwordEyeIcon);
-                });
+        }
+        const pwd = document.getElementById('password');
+        const strengthMsg = document.getElementById('strengthMsg');
+        pwd.addEventListener('input', function() {
+            const val = this.value;
+            let strength = 'weak';
+            if (val.length >= 8 && /[A-Z]/.test(val) && /[0-9]/.test(val) && /[!@#$%^&*(),.?":{}|<>]/.test(val)) {
+                strength = 'strong';
+                strengthMsg.innerHTML = '✓ Strong password';
+                strengthMsg.className = 'password-strength strong';
+            } else if (val.length >= 6) {
+                strength = 'medium';
+                strengthMsg.innerHTML = '⚠️ Medium – add uppercase, number, special char';
+                strengthMsg.className = 'password-strength medium';
+            } else {
+                strengthMsg.innerHTML = '❌ Weak – min 8 chars, uppercase, digit, special';
+                strengthMsg.className = 'password-strength weak';
             }
-
-            if (toggleConfirm && confirmPasswordInput && confirmEyeIcon) {
-                toggleConfirm.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    toggleVisibility(confirmPasswordInput, confirmEyeIcon);
-                });
+        });
+        function validatePassword() {
+            const pwdVal = pwd.value;
+            const confirmVal = document.getElementById('confirm').value;
+            if (pwdVal !== confirmVal) {
+                alert('Passwords do not match');
+                return false;
             }
-
-            // Optional: ensure that pressing "Enter" in any field doesn't conflict
-            // and that both fields maintain the same required behavior. No extra logic needed.
-        })();
+            if (pwdVal.length < 8 || !/[A-Z]/.test(pwdVal) || !/[0-9]/.test(pwdVal) || !/[!@#$%^&*(),.?":{}|<>]/.test(pwdVal)) {
+                alert('Password must be at least 8 characters, include uppercase, digit, and special character.');
+                return false;
+            }
+            return true;
+        }
     </script>
 </body>
 </html>

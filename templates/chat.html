@@ -2,70 +2,273 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>{{ get_text('title', lang) }} - Consultation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consultation - PhysioAI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.png') }}">
     <style>
-        .chat-container { height: calc(100vh - 280px); overflow-y: auto; }
-        .message-bubble { max-width: 90%; animation: fadeIn 0.3s ease-in; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @media (max-width: 640px) {
-            .chat-container { height: calc(100vh - 320px); }
-            .message-bubble { max-width: 95%; }
-            .container { padding-left: 0.75rem; padding-right: 0.75rem; }
-        }
+        .chat-container { height: 60vh; overflow-y: auto; }
+        .user-bubble { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 18px 18px 4px 18px; }
+        .ai-bubble { background: #f3f4f6; color: #1f2937; border-radius: 18px 18px 18px 4px; }
+        .typing-indicator span { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #9ca3af; margin: 0 2px; animation: typing 1.4s infinite ease-in-out; }
+        .typing-indicator span:nth-child(1) { animation-delay: 0s; }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typing { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-6px); opacity: 1; } }
+        .animate-pulse-slow { animation: pulse 2s cubic-bezier(0.4,0,0.6,1) infinite; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
 </head>
-<body class="bg-gradient-to-br from-purple-50 to-blue-50">
-    <div class="bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg">
-        <div class="container mx-auto px-3 sm:px-4 py-3">
-            <div class="flex flex-wrap justify-between items-center gap-2">
-                <div class="flex items-center space-x-2">
-                    <i class="fas fa-user-md text-xl sm:text-2xl"></i>
-                    <div>
-                        <h1 class="text-lg sm:text-xl font-bold">{{ get_text('title', lang) }}</h1>
-                        <p class="text-xs opacity-90 hidden sm:block">Dr. Physio (PT) | Patient: {{ patient_info.full_name }} | Age: {{ patient_info.age }}</p>
+<body class="bg-gradient-to-br from-purple-600 to-blue-600 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- Header -->
+        <div class="bg-white rounded-t-2xl shadow-lg p-4 flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-bold text-gray-800"><i class="fas fa-stethoscope text-purple-600 mr-2"></i>PhysioAI Consultation</h1>
+                <p class="text-sm text-gray-500">Dr. Physioo (Senior Physiotherapist)</p>
+            </div>
+            <div class="text-right">
+                <div class="text-sm font-semibold text-purple-600">Step <span id="currentStep">1</span> / {{ max_questions }}</div>
+                <div class="w-32 bg-gray-200 rounded-full h-2 mt-1">
+                    <div id="progressBar" class="bg-purple-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Patient Info Bar -->
+        <div class="bg-white px-4 py-2 border-b border-gray-200 text-sm">
+            <i class="fas fa-user-circle text-purple-600 mr-1"></i> 
+            <span class="font-medium">{{ patient_info.full_name }}</span> • Age {{ patient_info.age }} • {{ patient_info.gender }} • 
+            <span class="text-gray-600">{{ patient_info.occupation }}</span>
+        </div>
+
+        <!-- Chat Messages -->
+        <div id="chatContainer" class="chat-container bg-gray-50 p-4 space-y-3 overflow-y-auto" style="height: 55vh;">
+            <div class="text-center text-gray-400 text-sm py-2">
+                <i class="fas fa-comment-dots mr-1"></i> Answer Dr. Physioo's questions to get a complete report
+            </div>
+            <!-- Messages will be injected here -->
+        </div>
+
+        <!-- Input Area -->
+        <div class="bg-white rounded-b-2xl shadow-lg p-4">
+            <div class="flex gap-2">
+                <input type="text" id="userInput" placeholder="Type your answer..." 
+                       class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" 
+                       autocomplete="off">
+                <button id="sendBtn" onclick="sendMessage()" 
+                        class="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:scale-105 transition transform disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-paper-plane mr-1"></i> Send
+                </button>
+            </div>
+            <div class="text-xs text-center text-gray-400 mt-2">
+                <i class="fas fa-microphone-alt text-purple-500 mr-1"></i> Voice input coming soon
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let consultationId = null;
+        let isComplete = false;
+        let loading = false;
+        let currentStep = 1;
+        const maxQuestions = {{ max_questions }};
+
+        // Load initial chat state
+        async function loadChatState() {
+            try {
+                const res = await fetch('/get_chat_state');
+                const data = await res.json();
+                if (data.error) {
+                    window.location.href = '/';
+                    return;
+                }
+                consultationId = data.consultation_id;
+                isComplete = data.is_complete;
+                currentStep = data.current_step || 1;
+                updateStepDisplay();
+                renderMessages(data.messages);
+                if (isComplete) {
+                    disableInput(true);
+                    showCompleteMessage();
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function renderMessages(messages) {
+            const container = document.getElementById('chatContainer');
+            container.innerHTML = '';
+            if (!messages || messages.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-400 text-sm py-4">Loading conversation...</div>';
+                return;
+            }
+            for (let msg of messages) {
+                if (msg.role === 'user') {
+                    addMessageToUI(msg.content, 'user');
+                } else if (msg.role === 'assistant') {
+                    addMessageToUI(msg.content, 'ai');
+                }
+            }
+            // Scroll to bottom
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function addMessageToUI(text, sender) {
+            const container = document.getElementById('chatContainer');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `flex ${sender === 'user' ? 'justify-end' : 'justify-start'} mb-3`;
+            if (sender === 'user') {
+                msgDiv.innerHTML = `
+                    <div class="user-bubble max-w-[75%] px-4 py-2 rounded-2xl shadow">
+                        <p class="text-sm">${escapeHtml(text)}</p>
+                    </div>
+                `;
+            } else {
+                msgDiv.innerHTML = `
+                    <div class="ai-bubble max-w-[75%] px-4 py-2 rounded-2xl shadow">
+                        <div class="flex items-center gap-2 mb-1">
+                            <i class="fas fa-robot text-purple-500 text-xs"></i>
+                            <span class="text-xs font-semibold text-purple-600">Dr. Physioo</span>
+                        </div>
+                        <p class="text-sm">${escapeHtml(text)}</p>
+                    </div>
+                `;
+            }
+            container.appendChild(msgDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function showTyping() {
+            const container = document.getElementById('chatContainer');
+            const typingDiv = document.createElement('div');
+            typingDiv.id = 'typingIndicator';
+            typingDiv.className = 'flex justify-start mb-3';
+            typingDiv.innerHTML = `
+                <div class="ai-bubble px-4 py-3 rounded-2xl">
+                    <div class="typing-indicator flex items-center gap-1">
+                        <span></span><span></span><span></span>
+                        <span class="ml-2 text-xs text-gray-500">Dr. Physioo is thinking...</span>
                     </div>
                 </div>
-                <div class="flex flex-wrap gap-1 sm:gap-2 text-xs sm:text-sm">
-                    <span class="text-xs hidden sm:inline">Welcome, {{ session.full_name }}</span>
-                    <a href="/profile" class="bg-white/20 hover:bg-white/30 px-2 py-1 rounded text-xs"><i class="fas fa-user"></i> Profile</a>
-                    {% if session.role == 'admin' %}<a href="/admin" class="bg-yellow-500 hover:bg-yellow-600 px-2 py-1 rounded text-xs"><i class="fas fa-chart-line"></i> Admin</a>{% endif %}
-                    <a href="/" class="bg-white/20 hover:bg-white/30 px-2 py-1 rounded text-xs"><i class="fas fa-home"></i> Home</a>
-                    <a href="/history" class="bg-white/20 hover:bg-white/30 px-2 py-1 rounded text-xs"><i class="fas fa-history"></i> History</a>
-                    <a href="/reset" class="bg-white/20 hover:bg-white/30 px-2 py-1 rounded text-xs"><i class="fas fa-plus"></i> New</a>
-                    <a href="/logout" class="bg-red-500 hover:bg-red-600 px-2 py-1 rounded text-xs"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            `;
+            container.appendChild(typingDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function hideTyping() {
+            const typing = document.getElementById('typingIndicator');
+            if (typing) typing.remove();
+        }
+
+        async function sendMessage() {
+            if (loading || isComplete) return;
+            const input = document.getElementById('userInput');
+            const text = input.value.trim();
+            if (!text) return;
+            input.value = '';
+            loading = true;
+            // Disable send button during request
+            const sendBtn = document.getElementById('sendBtn');
+            sendBtn.disabled = true;
+            // Add user message to UI immediately
+            addMessageToUI(text, 'user');
+            showTyping();
+            try {
+                const res = await fetch('/send_answer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ answer: text })
+                });
+                const data = await res.json();
+                hideTyping();
+                if (data.is_complete) {
+                    isComplete = true;
+                    disableInput(true);
+                    showCompleteMessage();
+                    // Redirect to diagnosis selection after short delay
+                    setTimeout(() => {
+                        window.location.href = '/diagnosis_selection';
+                    }, 1500);
+                } else {
+                    // Add AI response
+                    const lastMsg = data.messages[data.messages.length - 1];
+                    if (lastMsg && lastMsg.role === 'assistant') {
+                        addMessageToUI(lastMsg.content, 'ai');
+                    }
+                    currentStep = data.current_step || currentStep + 1;
+                    updateStepDisplay();
+                }
+            } catch (err) {
+                hideTyping();
+                addMessageToUI('Sorry, an error occurred. Please try again.', 'ai');
+                console.error(err);
+            } finally {
+                loading = false;
+                sendBtn.disabled = isComplete;
+                if (!isComplete) {
+                    document.getElementById('userInput').focus();
+                }
+            }
+        }
+
+        function disableInput(disabled) {
+            const input = document.getElementById('userInput');
+            const sendBtn = document.getElementById('sendBtn');
+            input.disabled = disabled;
+            sendBtn.disabled = disabled;
+            if (disabled) {
+                input.placeholder = 'Consultation complete. Redirecting...';
+                input.classList.add('bg-gray-100');
+            } else {
+                input.placeholder = 'Type your answer...';
+                input.classList.remove('bg-gray-100');
+            }
+        }
+
+        function showCompleteMessage() {
+            const container = document.getElementById('chatContainer');
+            const completeDiv = document.createElement('div');
+            completeDiv.className = 'flex justify-center my-4';
+            completeDiv.innerHTML = `
+                <div class="bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-semibold animate-pulse-slow">
+                    <i class="fas fa-check-circle mr-1"></i> Consultation complete! Generating report...
                 </div>
-            </div>
-        </div>
-    </div>
-    <div class="container mx-auto px-3 sm:px-4 py-4">
-        <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
-            <div class="bg-gray-50 px-4 py-2 border-b border-gray-200 flex flex-wrap gap-2 text-xs sm:text-sm">
-                <span><i class="fas fa-comment-medical text-purple-600"></i> <strong>{{ get_text('chief_complaint', lang) }}:</strong> {{ patient_info.chief_complaint[:40] }}...</span>
-                <span><i class="fas fa-exclamation-triangle text-orange-600"></i> <strong>{{ get_text('cause_injury', lang) }}:</strong> {{ patient_info.cause_of_injury[:30] or 'Not specified' }}...</span>
-            </div>
-            <!-- Progress indicator -->
-            <div class="bg-gray-100 rounded-lg p-2 sm:p-3 m-2 text-center">
-                <div class="text-xs sm:text-sm text-gray-600">Step <span id="currentStep" data-max="{{ max_questions }}">{{ current_step }}</span> of {{ max_questions }}</div>
-                <div class="w-full bg-gray-200 rounded-full h-1.5 sm:h-2 mt-1"><div id="progressBar" class="bg-purple-600 h-1.5 sm:h-2 rounded-full" style="width: {{ (current_step / max_questions * 100)|round }}%"></div></div>
-            </div>
-            <div id="chatMessages" class="chat-container p-3 sm:p-6 space-y-3 sm:space-y-4 bg-gray-50">
-                <div class="text-center text-gray-500 py-8"><i class="fas fa-spinner fa-spin text-2xl"></i><p class="mt-2">{{ get_text('loading', lang) }}</p></div>
-            </div>
-            <div id="completionSection" class="hidden border-t border-gray-200 bg-white p-3 sm:p-4"><a href="/diagnosis_selection" class="block w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white text-center py-2 sm:py-3 rounded-lg font-semibold text-sm sm:text-base"><i class="fas fa-stethoscope mr-2"></i> Select Diagnosis & Continue</a></div>
-            <div class="border-t border-gray-200 p-3 sm:p-4 bg-white">
-                <div class="flex gap-2">
-                    <input type="text" id="messageInput" class="flex-1 px-3 py-2 sm:py-3 border border-gray-300 rounded-lg text-sm" placeholder="{{ get_text('placeholder', lang) }}" autocomplete="off">
-                    <button id="sendBtn" class="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm"><i class="fas fa-paper-plane"></i> {{ get_text('send', lang) }}</button>
-                </div>
-                <p class="text-xs text-gray-500 mt-2 text-center"><i class="fas fa-info-circle"></i> {{ get_text('info_questions', lang) }}</p>
-            </div>
-        </div>
-    </div>
-    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+            `;
+            container.appendChild(completeDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function updateStepDisplay() {
+            document.getElementById('currentStep').innerText = currentStep;
+            const percent = (currentStep / maxQuestions) * 100;
+            document.getElementById('progressBar').style.width = `${percent}%`;
+            if (currentStep >= maxQuestions) {
+                document.getElementById('progressBar').classList.add('bg-green-500');
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
+                return c;
+            });
+        }
+
+        // Press Enter to send
+        document.getElementById('userInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !loading && !isComplete) sendMessage();
+        });
+
+        // Initial load
+        loadChatState();
+    </script>
 </body>
 </html>
