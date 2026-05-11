@@ -1527,20 +1527,5 @@ def health_check():
 
 
 
-
-@app.route('/nuke_db')
-def nuke_database():
-    # ⚠️ DANGER: No IP restriction – anyone who finds this URL can delete your entire database.
-    import os
-    db_path = '/data/consultations.db'
-    if os.path.exists(db_path):
-        os.remove(db_path)
-        return "Database deleted. Restart the server to recreate a fresh database."
-    else:
-        return "Database file not found."
-
-
-
-
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)
