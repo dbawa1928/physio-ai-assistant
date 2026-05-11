@@ -99,7 +99,6 @@ Werkzeug==3.1.8
 wrapt==2.1.2
 xlsxwriter==3.2.9
 zopfli==0.4.1
-Flask==2.3.3
 groq==0.4.2
 flask-mail==0.9.1
 python-dotenv==1.0.0
