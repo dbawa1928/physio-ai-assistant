@@ -37,7 +37,7 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 app.config['CACHE_TYPE'] = 'SimpleCache'
 app.config['CACHE_DEFAULT_TIMEOUT'] = 300
 
-# Email configuration (optional – if not set, OTPs are printed to console)
+# Email configuration
 app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
 app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', 'True') == 'True'
@@ -53,9 +53,18 @@ cache = Cache(app)
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
+# ---------------------------- Database Path Configuration for Render ----------------------------
+# Use persistent disk on Render (/data) if it exists, otherwise local directory
+BASE_DIR = '/data' if os.path.exists('/data') else '.'
+os.makedirs(BASE_DIR, exist_ok=True)
+
+DB_PATH = os.path.join(BASE_DIR, 'consultations.db')
+FEEDBACK_DB_PATH = os.path.join(BASE_DIR, 'feedback.db')
+
 # ---------------------------- Database Setup ----------------------------
 def init_db():
-    conn = sqlite3.connect('consultations.db')
+    """Initialize main database and feedback database with all tables and default admin."""
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
     # Users table
@@ -163,19 +172,27 @@ def init_db():
     except sqlite3.OperationalError:
         pass
 
+    # Create default admin if not exists (or update password from env)
+    admin_email = "codexyra.connect@gmail.com"
+    admin_pass = os.getenv("ADMIN_PASSWORD", "Admin@123")
+    hashed = generate_password_hash(admin_pass)
+    # Check if admin exists
+    c.execute("SELECT id FROM users WHERE email = ?", (admin_email,))
+    existing = c.fetchone()
+    if existing:
+        # Update password and force change flag if needed
+        c.execute("UPDATE users SET password_hash = ?, must_change_password = 1 WHERE email = ?", (hashed, admin_email))
+    else:
+        c.execute('''INSERT INTO users 
+                     (username, email, phone, password_hash, role, full_name, created_at, must_change_password) 
+                     VALUES (?,?,?,?,?,?,?,?)''',
+                  ("admin", admin_email, "", hashed, "admin", "System Administrator", 
+                   datetime.now().isoformat(), 1))
     conn.commit()
-
-    # Create default admin if not exists
-    c.execute("SELECT id FROM users WHERE role='admin'")
-    if not c.fetchone():
-        hashed = generate_password_hash("Admin@123")
-        c.execute("INSERT INTO users (username, email, phone, password_hash, role, full_name, created_at, must_change_password) VALUES (?,?,?,?,?,?,?,?)",
-                  ("admin", "codexyra.connect@gmail.com", "", hashed, "admin", "System Administrator", datetime.now().isoformat(), 1))
-        conn.commit()
     conn.close()
 
     # Feedback DB
-    conn2 = sqlite3.connect('feedback.db')
+    conn2 = sqlite3.connect(FEEDBACK_DB_PATH)
     c2 = conn2.cursor()
     c2.execute('''CREATE TABLE IF NOT EXISTS feedback (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -188,6 +205,21 @@ def init_db():
     conn2.commit()
     conn2.close()
 
+def reset_database():
+    """Delete all data and reinitialize the database (used by admin route)."""
+    # Close any existing connections (not strictly necessary but safe)
+    # Delete the main database file
+    if os.path.exists(DB_PATH):
+        os.remove(DB_PATH)
+    if os.path.exists(FEEDBACK_DB_PATH):
+        os.remove(FEEDBACK_DB_PATH)
+    # Reinitialize
+    init_db()
+    # Also recreate the base directory if needed (already exists)
+    # Log the action (can't write to admin_logs because it's gone, so just print)
+    print(f"Database reset performed at {datetime.now().isoformat()}")
+
+# Initialize database on startup
 init_db()
 
 # ---------------------------- Helper Functions ----------------------------
@@ -209,7 +241,7 @@ def admin_required(f):
 
 def log_admin_action(action, target_type, target_id, details=""):
     if session.get('role') == 'admin':
-        conn = sqlite3.connect('consultations.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute("INSERT INTO admin_logs (admin_id, action, target_type, target_id, details, ip_address, timestamp) VALUES (?,?,?,?,?,?,?)",
                   (session['user_id'], action, target_type, target_id, details, request.remote_addr, datetime.now().isoformat()))
@@ -234,7 +266,6 @@ If you did not request this, please ignore this email.
 Best regards,
 PhysioAI Team
 """
-    # Print to console for development/testing
     print(f"\n=== OTP for {email} ===\n{otp}\n========================\n")
     if app.config['MAIL_USERNAME'] and app.config['MAIL_PASSWORD']:
         try:
@@ -244,10 +275,10 @@ PhysioAI Team
         except Exception as e:
             app.logger.error(f"Email send failed: {e}")
             return False
-    return True  # OTP printed to console
+    return True
 
 def save_consultation(consultation_id, patient_info, chat_history, final_report, structured_rec=None, diagnosis=None):
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     structured_json = json.dumps(structured_rec) if structured_rec else None
     c.execute('''INSERT OR REPLACE INTO consultations 
@@ -423,22 +454,19 @@ def forgot_password():
         email = request.form.get('email')
         if not email:
             return render_template('forgot_password.html', error='Email is required')
-        conn = sqlite3.connect('consultations.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute("SELECT id FROM users WHERE email = ?", (email,))
         user = c.fetchone()
         if not user:
             conn.close()
-            # Don't reveal if email exists
             return render_template('forgot_password.html', message='If that email is registered, you will receive an OTP.')
-        # Generate OTP
         otp = generate_otp()
         expiry = (datetime.now() + timedelta(minutes=10)).isoformat()
         c.execute("UPDATE users SET otp_code = ?, otp_expiry = ? WHERE id = ?", (otp, expiry, user[0]))
         conn.commit()
         conn.close()
         if send_otp_email(email, otp):
-            # Store email in session temporarily for OTP verification
             session['reset_email'] = email
             return redirect(url_for('verify_otp'))
         else:
@@ -454,7 +482,7 @@ def verify_otp():
         otp = request.form.get('otp')
         if not otp:
             return render_template('verify_otp.html', error='OTP is required', email=email)
-        conn = sqlite3.connect('consultations.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute("SELECT id, otp_code, otp_expiry FROM users WHERE email = ?", (email,))
         user = c.fetchone()
@@ -468,8 +496,7 @@ def verify_otp():
             return render_template('verify_otp.html', error='OTP expired. Please request a new one.', email=email)
         if otp != stored_otp:
             return render_template('verify_otp.html', error='Invalid OTP. Please try again.', email=email)
-        # OTP valid – clear it and proceed to reset password
-        conn = sqlite3.connect('consultations.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute("UPDATE users SET otp_code = NULL, otp_expiry = NULL WHERE id = ?", (user[0],))
         conn.commit()
@@ -491,7 +518,7 @@ def reset_password_with_otp():
         if password != confirm:
             return render_template('reset_password_otp.html', error='Passwords do not match.')
         hashed = generate_password_hash(password)
-        conn = sqlite3.connect('consultations.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?", (hashed, session['reset_user_id']))
         conn.commit()
@@ -506,7 +533,7 @@ def login():
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
-        conn = sqlite3.connect('consultations.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute("SELECT id, password_hash, role, full_name, must_change_password FROM users WHERE email = ?", (email,))
         user = c.fetchone()
@@ -516,7 +543,7 @@ def login():
             session['role'] = user[2]
             session['full_name'] = user[3] if user[3] else email.split('@')[0]
             session['email'] = email
-            conn = sqlite3.connect('consultations.db')
+            conn = sqlite3.connect(DB_PATH)
             c = conn.cursor()
             c.execute("UPDATE users SET last_login = ? WHERE id = ?", (datetime.now().isoformat(), user[0]))
             conn.commit()
@@ -538,7 +565,7 @@ def register():
         confirm = request.form['confirm_password']
         if password != confirm:
             return render_template('register.html', error='Passwords do not match')
-        conn = sqlite3.connect('consultations.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute("SELECT id FROM users WHERE email = ?", (email,))
         if c.fetchone():
@@ -570,7 +597,7 @@ def logout():
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
 def profile():
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     if request.method == 'POST':
         full_name = request.form['full_name']
@@ -594,7 +621,7 @@ def change_password():
         confirm = request.form['confirm_password']
         if new != confirm:
             return render_template('change_password.html', error='New passwords do not match')
-        conn = sqlite3.connect('consultations.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute("SELECT password_hash FROM users WHERE id = ?", (session['user_id'],))
         stored = c.fetchone()[0]
@@ -612,7 +639,7 @@ def change_password():
 @app.route('/admin')
 @admin_required
 def admin():
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
     c.execute("SELECT COUNT(*) FROM users WHERE role='doctor'")
@@ -624,7 +651,7 @@ def admin():
     c.execute("SELECT COUNT(DISTINCT patient_name) FROM consultations")
     unique_patients = c.fetchone()[0]
 
-    conn2 = sqlite3.connect('feedback.db')
+    conn2 = sqlite3.connect(FEEDBACK_DB_PATH)
     c2 = conn2.cursor()
     c2.execute("SELECT rating, COUNT(*) FROM feedback GROUP BY rating")
     feedback_stats = dict(c2.fetchall())
@@ -668,6 +695,18 @@ def admin():
                          chart_data=chart_data,
                          feedback_stats=feedback_stats)
 
+# ---------------------------- Database Reset Route (Admin only) ----------------------------
+@app.route('/admin/reset_database', methods=['POST'])
+@admin_required
+def reset_database_route():
+    """Permanently delete all data and reinitialize the database with default admin."""
+    try:
+        reset_database()
+        log_admin_action('reset_database', 'system', 'all', 'Database fully reset by admin')
+        return jsonify({'status': 'success', 'message': 'Database has been reset. Please log in again.'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/admin/update_doctor', methods=['POST'])
 @admin_required
 def admin_update_doctor():
@@ -677,7 +716,7 @@ def admin_update_doctor():
     phone = data.get('phone')
     if not doctor_id:
         return jsonify({'error': 'Missing doctor ID'}), 400
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("UPDATE users SET full_name = ?, phone = ? WHERE id = ? AND role = 'doctor'", (full_name, phone, doctor_id))
     conn.commit()
@@ -688,7 +727,7 @@ def admin_update_doctor():
 @app.route('/admin/doctor_details/<int:doctor_id>')
 @admin_required
 def admin_doctor_details(doctor_id):
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT id, username, full_name, email, phone, created_at, last_login FROM users WHERE id = ? AND role = 'doctor'", (doctor_id,))
     doctor = c.fetchone()
@@ -718,7 +757,7 @@ def admin_delete_doctor():
     doctor_id = data.get('id')
     if not doctor_id:
         return jsonify({'error': 'Missing doctor ID'}), 400
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("DELETE FROM consultations WHERE user_id = ?", (doctor_id,))
     c.execute("DELETE FROM users WHERE id = ? AND role = 'doctor'", (doctor_id,))
@@ -730,7 +769,7 @@ def admin_delete_doctor():
 @app.route('/admin/export/<string:type>')
 @admin_required
 def export_data(type):
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     output = io.StringIO()
     writer = csv.writer(output)
     if type == 'consultations':
@@ -746,7 +785,7 @@ def export_data(type):
         writer.writerows(c.fetchall())
         filename = f"doctors_{datetime.now().strftime('%Y%m%d')}.csv"
     elif type == 'feedback':
-        conn2 = sqlite3.connect('feedback.db')
+        conn2 = sqlite3.connect(FEEDBACK_DB_PATH)
         c2 = conn2.cursor()
         c2.execute("SELECT consultation_id, rating, comment, timestamp FROM feedback")
         writer.writerow(['Consultation ID', 'Rating', 'Comment', 'Timestamp'])
@@ -767,7 +806,7 @@ def bulk_delete():
     ids = data.get('ids', [])
     if not ids:
         return jsonify({'error': 'No IDs provided'}), 400
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     placeholders = ','.join('?' * len(ids))
     c.execute(f"DELETE FROM consultations WHERE id IN ({placeholders})", ids)
@@ -780,7 +819,7 @@ def bulk_delete():
 @app.route('/admin/logs')
 @admin_required
 def admin_logs():
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT timestamp, action, target_type, target_id, details, ip_address FROM admin_logs ORDER BY timestamp DESC LIMIT 100")
     logs = [{'timestamp': r[0], 'action': r[1], 'target_type': r[2], 'target_id': r[3], 'details': r[4], 'ip_address': r[5]} for r in c.fetchall()]
@@ -796,9 +835,9 @@ def health_monitor():
         api_latency = round((time.time() - start) * 1000, 2)
     except:
         api_latency = None
-    db_size = os.path.getsize('consultations.db') / (1024*1024) if os.path.exists('consultations.db') else 0
+    db_size = os.path.getsize(DB_PATH) / (1024*1024) if os.path.exists(DB_PATH) else 0
     cache_hits = len(cache.cache._cache) if hasattr(cache.cache, '_cache') else 0
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM users")
     total_users = c.fetchone()[0]
@@ -814,7 +853,7 @@ def health_monitor():
 @app.route('/admin/dashboard_data')
 @admin_required
 def dashboard_data():
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT diagnosis, COUNT(*) as cnt FROM consultations WHERE diagnosis IS NOT NULL GROUP BY diagnosis ORDER BY cnt DESC LIMIT 5")
     top_diagnoses = [{'name': row[0][:50], 'count': row[1]} for row in c.fetchall()]
@@ -838,13 +877,13 @@ def dashboard_data():
 @app.route('/admin/doctor_performance')
 @admin_required
 def doctor_performance():
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT u.id, u.full_name, COUNT(c.id) as total_consults, COUNT(DISTINCT c.patient_name) as unique_patients FROM users u LEFT JOIN consultations c ON u.id = c.user_id WHERE u.role='doctor' GROUP BY u.id")
     doctors = []
     for row in c.fetchall():
         doc_id, name, total, unique = row
-        conn2 = sqlite3.connect('feedback.db')
+        conn2 = sqlite3.connect(FEEDBACK_DB_PATH)
         c2 = conn2.cursor()
         c2.execute("SELECT rating, COUNT(*) FROM feedback WHERE consultation_id IN (SELECT id FROM consultations WHERE user_id=?) GROUP BY rating", (doc_id,))
         fb = dict(c2.fetchall())
@@ -865,11 +904,6 @@ def doctor_performance():
 # ---------------------------- Asynchronous PDF Generation ----------------------------
 def generate_pdf_async(consultation_id, user_id, patient_info, diagnosis, structured_rec, doctor_name):
     time.sleep(0.5)
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.units import inch
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=0.75*inch, rightMargin=0.75*inch, topMargin=0.75*inch, bottomMargin=0.75*inch)
     styles = getSampleStyleSheet()
@@ -935,12 +969,12 @@ def generate_pdf_async(consultation_id, user_id, patient_info, diagnosis, struct
         canvas_obj.restoreState()
     doc.build(story, onFirstPage=add_watermark, onLaterPages=add_watermark)
     buffer.seek(0)
-    os.makedirs('static/temp', exist_ok=True)
+    os.makedirs(os.path.join(BASE_DIR, 'static', 'temp'), exist_ok=True)
     filename = f"report_{consultation_id}.pdf"
-    filepath = os.path.join('static', 'temp', filename)
+    filepath = os.path.join(BASE_DIR, 'static', 'temp', filename)
     with open(filepath, 'wb') as f:
         f.write(buffer.getvalue())
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("UPDATE async_tasks SET status='completed', result_path=?, completed_at=? WHERE id=?", (filepath, datetime.now().isoformat(), consultation_id))
     conn.commit()
@@ -949,7 +983,7 @@ def generate_pdf_async(consultation_id, user_id, patient_info, diagnosis, struct
 @app.route('/request_pdf/<consultation_id>')
 @login_required
 def request_pdf(consultation_id):
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT status, result_path FROM async_tasks WHERE id=?", (consultation_id,))
     task = c.fetchone()
@@ -983,7 +1017,7 @@ def save_voice_note():
     transcript = data.get('transcript', '')
     if not consultation_id or not audio_data:
         return jsonify({'error': 'Missing data'}), 400
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("INSERT INTO voice_notes (consultation_id, note_type, audio_data, transcript, created_at) VALUES (?,?,?,?,?)",
               (consultation_id, 'doctor_note', audio_data, transcript, datetime.now().isoformat()))
@@ -995,7 +1029,7 @@ def save_voice_note():
 @app.route('/print_report/<consultation_id>')
 @login_required
 def print_report(consultation_id):
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     if session.get('role') == 'admin':
         c.execute("SELECT * FROM consultations WHERE id=?", (consultation_id,))
@@ -1112,17 +1146,12 @@ def send_answer():
         session.modified = True
         return jsonify({'is_complete': True, 'messages': session['chat_history'], 'consultation_id': session['consultation_id']})
 
-    # --- Extract all assistant questions already asked ---
     asked_questions = [msg['content'] for msg in session['chat_history'] if msg['role'] == 'assistant']
     asked_questions_text = "\n".join([f"- {q}" for q in asked_questions]) if asked_questions else "None yet."
-
-    # --- Extract known facts from patient answers (deduplicated) ---
     patient_answers = [msg['content'] for msg in session['chat_history'] if msg['role'] == 'user']
-    # Remove duplicates while preserving order
     unique_answers = list(dict.fromkeys(patient_answers))
     known_facts_text = "\n".join([f"- {fact}" for fact in unique_answers]) if unique_answers else "None yet."
-
-    last_few = session['chat_history'][-6:]  # keep recent conversation for context
+    last_few = session['chat_history'][-6:]
     conversation = "\n".join([f"{m['role']}: {m['content']}" for m in last_few])
 
     prompt = f"""You are Dr. Physioo, senior physiotherapist (20 years experience). Continue the consultation.
@@ -1189,7 +1218,7 @@ def save_selected_diagnoses():
     chat_history = session.get('chat_history', [])
     structured_rec = generate_structured_recommendations(patient_info, chat_history, primary_diagnosis)
     session['structured_recommendations'] = structured_rec
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("UPDATE consultations SET diagnosis = ?, structured_recommendations = ? WHERE id = ?",
               (primary_diagnosis, json.dumps(structured_rec), consultation_id))
@@ -1203,7 +1232,7 @@ def report_edit():
     if 'consultation_id' not in session:
         return redirect(url_for('index'))
     consultation_id = session['consultation_id']
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT patient_name, age, gender, phone, occupation, chief_complaint, diagnosis, structured_recommendations, date FROM consultations WHERE id=? AND (user_id=? OR ?=1)", 
               (consultation_id, session['user_id'], session.get('role')=='admin'))
@@ -1220,7 +1249,7 @@ def report_edit():
         except:
             structured_rec = {}
     date = row[8]
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT id, patient_name, diagnosis, date FROM consultations WHERE patient_name=? AND id!=? AND user_id=? ORDER BY date DESC LIMIT 5", 
               (patient_info['full_name'], consultation_id, session['user_id']))
@@ -1240,7 +1269,7 @@ def save_structured_recommendations():
     diagnosis = data.get('diagnosis')
     if not consultation_id or not recommendations:
         return jsonify({'error': 'Missing data'}), 400
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("UPDATE consultations SET structured_recommendations = ?, diagnosis = ? WHERE id = ? AND (user_id=? OR ?=1)", 
               (json.dumps(recommendations), diagnosis, consultation_id, session['user_id'], session.get('role')=='admin'))
@@ -1251,7 +1280,7 @@ def save_structured_recommendations():
 @app.route('/download_structured_pdf/<consultation_id>')
 @login_required
 def download_structured_pdf(consultation_id):
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT patient_name, age, gender, phone, occupation, chief_complaint, diagnosis, structured_recommendations, date FROM consultations WHERE id=? AND (user_id=? OR ?=1)", 
               (consultation_id, session['user_id'], session.get('role')=='admin'))
@@ -1280,10 +1309,10 @@ def download_structured_pdf(consultation_id):
     story.append(Spacer(1, 12))
     story.append(Paragraph("Patient Information", heading_style))
     patient_data = [
-    [f"Name: {patient['name']}", f"Age: {patient['age']}", f"Gender: {patient['gender']}"],
-    [f"Phone: {patient['phone']}", f"Occupation: {patient['occupation']}", ""],
-    [f"Chief Complaint: {patient['chief_complaint']}", "", ""]
-]
+        [f"Name: {patient['name']}", f"Age: {patient['age']}", f"Gender: {patient['gender']}"],
+        [f"Phone: {patient['phone']}", f"Occupation: {patient['occupation']}", ""],
+        [f"Chief Complaint: {patient['chief_complaint']}", "", ""]
+    ]
     t = Table(patient_data, colWidths=[2.2*inch, 1.8*inch, 1.8*inch])
     t.setStyle(TableStyle([
         ('FONTSIZE', (0,0), (-1,-1), 9),
@@ -1334,7 +1363,7 @@ def download_structured_pdf(consultation_id):
 @login_required
 def submit_feedback():
     data = request.json
-    conn = sqlite3.connect('feedback.db')
+    conn = sqlite3.connect(FEEDBACK_DB_PATH)
     c = conn.cursor()
     c.execute("INSERT INTO feedback (consultation_id, message_index, rating, comment, timestamp) VALUES (?,?,?,?,?)",
               (data.get('consultation_id'), data.get('message_index'), data.get('rating'), data.get('comment', ''), datetime.now().isoformat()))
@@ -1356,7 +1385,7 @@ def reset():
 @login_required
 def history():
     lang = session.get('lang', 'en')
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     if session.get('role') == 'admin':
         c.execute("SELECT id, patient_name, age, diagnosis, date FROM consultations ORDER BY date DESC")
@@ -1371,7 +1400,7 @@ def history():
 @login_required
 def view_report(report_id):
     lang = session.get('lang', 'en')
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     if session.get('role') == 'admin':
         c.execute("SELECT * FROM consultations WHERE id=?", (report_id,))
@@ -1399,7 +1428,7 @@ def view_report(report_id):
 @app.route('/share_whatsapp/<report_id>')
 @login_required
 def share_whatsapp(report_id):
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     if session.get('role') == 'admin':
         c.execute("SELECT phone, diagnosis FROM consultations WHERE id=?", (report_id,))
@@ -1417,7 +1446,7 @@ def share_whatsapp(report_id):
 @app.route('/delete_consultation/<consultation_id>', methods=['POST'])
 @login_required
 def delete_consultation(consultation_id):
-    conn = sqlite3.connect('consultations.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     if session.get('role') == 'admin':
         c.execute("DELETE FROM consultations WHERE id = ?", (consultation_id,))
