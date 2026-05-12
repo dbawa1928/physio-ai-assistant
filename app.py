@@ -47,7 +47,7 @@ app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', 'noreply@ph
 
 mail = Mail(app)
 
-limiter = Limiter(key_func=get_remote_address, default_limits=["200 per day", "50 per hour"])
+limiter = Limiter(key_func=get_remote_address, default_limits=["500 per day", "200 per hour"])
 limiter.init_app(app)
 cache = Cache(app)
 
